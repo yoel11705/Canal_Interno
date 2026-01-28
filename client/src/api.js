@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://192.168.137.1:5000/api';
+const API_URL = 'http://172.20.3.159:5000/api';
 
 const api = {
     getVideo: async (category) => {

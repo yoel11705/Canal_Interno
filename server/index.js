@@ -9,7 +9,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const HOST_IP = '192.168.137.1'; 
+const HOST_IP = '172.20.3.159'; 
 
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -30,7 +30,7 @@ app.use('/api/videos', videoRoutes);
 
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
-app.get('*', (req, res) => {
+app.get(/(.*)/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 

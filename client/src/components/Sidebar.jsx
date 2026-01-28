@@ -9,7 +9,7 @@ const Sidebar = ({ onAdminClick }) => {
     const menuItems = [
         { name: 'Inicio', path: '/inicio', icon: <FaHome /> },
         { name: 'HH', path: '/hh', icon: <FaCocktail /> },
-        { name: 'Service Room', path: '/service-room', icon: <FaConciergeBell /> },
+        { name: 'Room Service', path: '/service-room', icon: <FaConciergeBell /> },
         { name: 'Promociones', path: '/promociones', icon: <FaTags /> },
         { name: 'Clientes', path: '/clientes', icon: <FaUsers /> },
     ];
