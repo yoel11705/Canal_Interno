@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 const dotenv = require('dotenv');
+const fs = require('fs'); 
 const db = require('./db');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -27,6 +28,49 @@ const videoRoutes = require('./routes/videos');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/videos', videoRoutes);
+
+
+const ROTATION_FILE = path.join(__dirname, 'rotations.json');
+
+app.get('/api/rotation/:category', (req, res) => {
+    const { category } = req.params;
+    
+    if (!fs.existsSync(ROTATION_FILE)) {
+        fs.writeFileSync(ROTATION_FILE, JSON.stringify({}));
+    }
+
+    try {
+        const fileData = fs.readFileSync(ROTATION_FILE);
+        const rotations = JSON.parse(fileData);
+        res.json({ rotation: rotations[category] || 0 });
+    } catch (error) {
+        console.error("Error leyendo rotación:", error);
+        res.status(500).json({ rotation: 0 });
+    }
+});
+
+app.post('/api/rotation/:category', (req, res) => {
+    const { category } = req.params;
+    const { rotation } = req.body;
+
+    if (!fs.existsSync(ROTATION_FILE)) {
+        fs.writeFileSync(ROTATION_FILE, JSON.stringify({}));
+    }
+
+    try {
+        const fileData = fs.readFileSync(ROTATION_FILE);
+        const rotations = JSON.parse(fileData);
+
+        rotations[category] = rotation;
+
+        fs.writeFileSync(ROTATION_FILE, JSON.stringify(rotations, null, 2));
+
+        res.json({ success: true, rotation: rotation });
+    } catch (error) {
+        console.error("Error guardando rotación:", error);
+        res.status(500).json({ success: false });
+    }
+});
 
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
