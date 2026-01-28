@@ -9,11 +9,14 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const HOST_IP = '192.168.137.1'; 
 
 app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false, 
 }));
-app.use(cors());
+
+app.use(cors()); 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -25,12 +28,16 @@ const videoRoutes = require('./routes/videos');
 app.use('/api/auth', authRoutes);
 app.use('/api/videos', videoRoutes);
 
-app.get('/', (req, res) => {
-    res.send('Hotel TV API is running');
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
-
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\nSERVIDOR INICIADO EXITOSAMENTE`);
+    console.log(`--------------------------------------------------`);
+    console.log(` PARA VER EN LAS PANTALLAS USA ESTA URL:`);
+    console.log(` http://${HOST_IP}:${PORT}`);
+    console.log(`--------------------------------------------------\n`);
 });
