@@ -9,48 +9,35 @@ const VideoPlayer = ({ category }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [error, setError] = useState(null);
 
-    // 1. ESTADO DE LA ROTACIÓN
     const [rotation, setRotation] = useState(0);
     
-    // 2. SEMÁFORO DE SEGURIDAD (Evita que se guarden datos equivocados al cambiar de video)
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // --- EFECTO DE CARGA (Lectura) ---
-    // Se ejecuta SOLAMENTE cuando cambia la categoría (ej: de Lobby a HH)
     useEffect(() => {
-        // A) Ponemos el semáforo en ROJO: "Prohibido guardar cambios ahora mismo"
         setIsLoaded(false);
 
-        // B) Leemos la memoria específica de ESTA categoría
         const savedRotation = localStorage.getItem(`rotation-${category}`);
         
-        // C) Aplicamos la rotación guardada (o 0 si es nuevo)
         if (savedRotation) {
             setRotation(parseInt(savedRotation, 10));
         } else {
             setRotation(0);
         }
 
-        // D) Esperamos un instante (50ms) para que React actualice el estado
-        // y luego ponemos el semáforo en VERDE.
         const timer = setTimeout(() => {
             setIsLoaded(true);
         }, 50);
 
-        return () => clearTimeout(timer); // Limpieza
+        return () => clearTimeout(timer);
     }, [category]);
 
-    // --- EFECTO DE GUARDADO (Escritura) ---
-    // Se ejecuta cuando rotas el video manualmente
+    
     useEffect(() => {
-        // SOLO guardamos si el semáforo está en VERDE (isLoaded === true)
-        // Esto evita el bug de que un video sobrescriba al otro
         if (isLoaded) {
             localStorage.setItem(`rotation-${category}`, rotation);
         }
     }, [rotation, category, isLoaded]);
 
-    // Carga del video (URL)
     useEffect(() => {
         const fetchVideo = async () => {
             setError(null);
@@ -67,7 +54,6 @@ const VideoPlayer = ({ category }) => {
     }, [category]);
 
     const rotateVideo = () => {
-        // Solo permitimos rotar si ya terminó de cargar
         if (isLoaded) {
             setRotation(prev => (prev + 90) % 360);
         }
@@ -119,7 +105,6 @@ const VideoPlayer = ({ category }) => {
                 </div>
             )}
 
-            {/* Controles (solo visibles si NO es pantalla completa) */}
             {videoSrc && (
                 <div className="controls-overlay">
                     <button className="control-btn" onClick={rotateVideo} title="Rotar">

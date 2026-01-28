@@ -22,7 +22,6 @@
     transition: transform 0.4s ease-in-out, width 0.4s ease-in-out, height 0.4s ease-in-out;
 }
 
-/* --- CONTROLES --- */
 .controls-overlay {
     position: absolute;
     bottom: 20px;
@@ -38,19 +37,16 @@
     transition: opacity 0.3s ease;
 }
 
-/* Mostrar controles al pasar el mouse (solo en modo normal) */
 .video-container:hover .controls-overlay {
     opacity: 1;
 }
 
-/* --- REGLA ESTRICTA DE OCULTAR EN FULLSCREEN --- */
 .fullscreen-mode .controls-overlay {
     display: none !important;
     opacity: 0 !important;
     pointer-events: none;
 }
 
-/* Botones */
 .control-btn {
     background: transparent;
     border: 2px solid white;
