@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import api from '../../api';
 import './Dashboard.css';
 
-const categories = ['Inicio', 'HH', 'Service Room', 'Promociones', 'Clientes'];
+const categories = ['Inicio', 'HH', 'Room Service', 'Promociones', 'Clientes'];
 
 const Dashboard = ({ onLogout }) => {
     const [uploading, setUploading] = useState(null);
