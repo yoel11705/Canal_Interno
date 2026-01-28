@@ -1,0 +1,17 @@
+CREATE DATABASE IF NOT EXISTS canal_interno;
+USE canal_interno;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS videos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category ENUM('HH', 'Inicio', 'Service Room', 'Promociones', 'Clientes') NOT NULL UNIQUE,
+    filename VARCHAR(255) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
