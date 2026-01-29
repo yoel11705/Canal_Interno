@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { FaExpand, FaRedo } from 'react-icons/fa'; // Asegúrate de importar iconos si usas
 import './VideoPlayer.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL ;
 
 const VideoPlayer = ({ category }) => {
     const videoRef = useRef(null);
