@@ -53,7 +53,6 @@ const initDB = async () => {
 
         await crearUsuarioSiNoExiste('Carlos', 'C_Mexsa0126');
         await crearUsuarioSiNoExiste('Recepcion', 'Hotel2024'); 
-        await crearUsuarioSiNoExiste('Gerente', 'AdminTotal');  
 
     } catch (err) {
         console.error('❌ ERROR INICIALIZANDO DB:', err);
