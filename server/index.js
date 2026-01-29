@@ -12,10 +12,8 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-// Si pusiste una clave en .env la usa, si no, usa la frase por defecto
 const SECRET_KEY = process.env.JWT_SECRET || "mi_secreto_super_seguro";
 
-// --- 1. CONFIGURACIONES ---
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
@@ -25,16 +23,13 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Conexión a Base de Datos SQL (Neon)
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false } 
 });
 
-// --- 2. INICIALIZACIÓN DE TABLAS Y USUARIOS ---
 const initDB = async () => {
     try {
-        // Crear Tabla de Usuarios
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -65,7 +60,6 @@ const initDB = async () => {
     }
 };
 
-// Función inteligente para crear usuarios sin duplicados
 async function crearUsuarioSiNoExiste(nombreUser, passwordUser) {
     try {
         // 1. Buscamos si ya existe
@@ -85,33 +79,27 @@ async function crearUsuarioSiNoExiste(nombreUser, passwordUser) {
     }
 }
 
-// Ejecutamos la inicialización
 initDB();
 
-// --- 3. CONFIGURAR SUBIDA DE VIDEOS ---
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: { folder: 'hotel-screens', resource_type: 'video' },
 });
 const upload = multer({ storage: storage });
 
-// --- 4. RUTAS (API) ---
 
 // LOGIN
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        // Buscar usuario
         const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
         const user = result.rows[0];
 
         if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
 
-        // Verificar contraseña
         const validPass = await bcrypt.compare(password, user.password);
         if (!validPass) return res.status(400).json({ error: 'Contraseña incorrecta' });
 
-        // Crear Token
         const token = jwt.sign({ id: user.id }, SECRET_KEY);
         res.json({ token, username });
     } catch (error) {
@@ -120,14 +108,12 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// OBTENER DATOS DE PANTALLA
 app.get('/api/screen/:category', async (req, res) => {
     const { category } = req.params;
     try {
         let result = await pool.query('SELECT * FROM screens WHERE category = $1', [category]);
         
         if (result.rows.length === 0) {
-            // Si la pantalla no existe en la DB, la creamos al momento
             result = await pool.query(
                 'INSERT INTO screens (category, rotation, video_url) VALUES ($1, 0, \'\') RETURNING *',
                 [category]
@@ -139,12 +125,10 @@ app.get('/api/screen/:category', async (req, res) => {
     }
 });
 
-// CAMBIAR ROTACIÓN
 app.post('/api/rotation/:category', async (req, res) => {
     const { category } = req.params;
     const { rotation } = req.body;
     try {
-        // Actualizar si existe, Insertar si no (Upsert)
         const query = `
             INSERT INTO screens (category, rotation) VALUES ($1, $2)
             ON CONFLICT (category) DO UPDATE SET rotation = $2 RETURNING *;
@@ -160,7 +144,6 @@ app.post('/api/upload/:category', upload.single('video'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
         
-        // Guardar URL del video en la base de datos
         const query = `
             INSERT INTO screens (category, video_url, public_id) VALUES ($1, $2, $3)
             ON CONFLICT (category) DO UPDATE SET video_url = $2, public_id = $3 RETURNING *;

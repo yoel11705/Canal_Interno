@@ -13,7 +13,6 @@ const LoginModal = ({ onClose, onLogin }) => {
         setIsLoading(true);
 
         try {
-            // 1. Conectamos directamente con TU servidor backend
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: {
@@ -29,14 +28,11 @@ const LoginModal = ({ onClose, onLogin }) => {
                 throw new Error(data.error || 'Error al iniciar sesión');
             }
 
-            // 3. ¡Éxito! Guardamos el token y cerramos
-            // data.token viene de tu backend (res.json({ token, username }))
             console.log("Login exitoso:", data.username);
             onLogin(data.token); 
             
         } catch (err) {
             console.error("Error de conexión:", err);
-            // Si el servidor está apagado, el error será "Failed to fetch"
             const mensaje = err.message === 'Failed to fetch' 
                 ? 'No se puede conectar con el servidor (¿Está prendido?)' 
                 : err.message;

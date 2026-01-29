@@ -24,10 +24,9 @@ const Dashboard = ({ onLogout }) => {
         try {
             const token = localStorage.getItem('token');
             
-            // --- CORRECCIÓN AQUÍ ---
-            // Antes faltaba pasar 'category' como primer dato
+           
             await api.uploadVideo(category, formData, token);
-            // ------------------------
+            
 
             setMessage({ type: 'success', text: `✅ Video de ${category} actualizado con éxito!` });
         } catch (error) {
@@ -41,10 +40,7 @@ const Dashboard = ({ onLogout }) => {
 
     const handleDelete = async (category) => {
         alert("⚠️ Función no disponible aún: Para borrar un video, simplemente sube uno nuevo que lo reemplace.");
-        /* NOTA: Comentamos esto porque tu servidor (index.js) NO tiene ruta de DELETE.
-           Si quieres borrar, tendríamos que programar el backend primero.
-           Por ahora, el sistema funciona "reemplazando" el video viejo por el nuevo.
-        */
+      
     };
 
     return (

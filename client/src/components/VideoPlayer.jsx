@@ -1,17 +1,16 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { FaExpand, FaRedo } from 'react-icons/fa'; // Asegúrate de importar iconos si usas
+import { FaExpand, FaRedo } from 'react-icons/fa';
 import './VideoPlayer.css';
 
 const API_URL = import.meta.env.VITE_API_URL ;
 
 const VideoPlayer = ({ category }) => {
     const videoRef = useRef(null);
-    const containerRef = useRef(null); // Referencia al contenedor principal
+    const containerRef = useRef(null); 
     const [videoSrc, setVideoSrc] = useState(null);
     const [rotation, setRotation] = useState(0);
     const [loading, setLoading] = useState(false);
     
-    // ESTADO NUEVO: Para saber si estamos en full screen
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     const checkStatus = async () => {
@@ -42,17 +41,13 @@ const VideoPlayer = ({ category }) => {
         return () => clearInterval(interval);
     }, [category]);
 
-    // --- NUEVO: DETECTOR DE EVENTOS DE PANTALLA COMPLETA ---
     useEffect(() => {
         const handleFullscreenChange = () => {
-            // Si hay un elemento en fullscreen, ponemos true, si no, false
             setIsFullscreen(!!document.fullscreenElement);
         };
 
-        // Escuchamos el evento del navegador
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         
-        // Limpieza al salir
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
 
@@ -68,7 +63,6 @@ const VideoPlayer = ({ category }) => {
 
     const toggleFull = () => {
         if (!document.fullscreenElement) {
-            // Usamos containerRef para que abarque TODO (botones y video)
             containerRef.current?.requestFullscreen();
         } else {
             document.exitFullscreen();
@@ -78,7 +72,6 @@ const VideoPlayer = ({ category }) => {
     const isVertical = rotation === 90 || rotation === 270;
 
     return (
-        // AQUI ESTA LA CLAVE: Agregamos la clase dinámicamente
         <div 
             ref={containerRef}
             className={`video-container ${isFullscreen ? 'fullscreen-mode' : ''}`}
