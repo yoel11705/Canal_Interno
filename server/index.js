@@ -1,87 +1,110 @@
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const path = require('path');
+const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const fs = require('fs'); 
-const db = require('./db');
+const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 
-dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const HOST_IP = '172.20.3.159'; 
 
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-    contentSecurityPolicy: false, 
-}));
-
-app.use(cors()); 
+// --- 1. CONFIGURACIONES ---
+app.use(cors({ origin: '*' })); // Permitir acceso desde cualquier lugar
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Configurar Cloudinary (Videos)
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-const authRoutes = require('./routes/auth');
-const videoRoutes = require('./routes/videos');
+// Configurar MongoDB (Base de Datos)
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('CONECTADO A MONGODB'))
+    .catch(err => console.error('ERROR MONGODB:', err));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/videos', videoRoutes);
+// --- 2. MODELO DE DATOS (Esquema) ---
+// Así se guardará la info de cada pantalla en la nube
+const ScreenSchema = new mongoose.Schema({
+    category: { type: String, required: true, unique: true }, // ej: "lobby"
+    rotation: { type: Number, default: 0 },
+    videoUrl: { type: String, default: "" }, // Link de Cloudinary
+    publicId: { type: String, default: "" }  // ID para borrarlo después si hace falta
+});
 
+const Screen = mongoose.model('Screen', ScreenSchema);
 
-const ROTATION_FILE = path.join(__dirname, 'rotations.json');
+// --- 3. CONFIGURAR SUBIDA DE VIDEOS ---
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'hotel-screens', // Nombre de la carpeta en Cloudinary
+        resource_type: 'video',  // Importante: le decimos que son videos
+    },
+});
+const upload = multer({ storage: storage });
 
-app.get('/api/rotation/:category', (req, res) => {
+// --- 4. RUTAS (API) ---
+
+// RUTA A: Obtener info de una pantalla (Video actual y Rotación)
+app.get('/api/screen/:category', async (req, res) => {
     const { category } = req.params;
-    
-    if (!fs.existsSync(ROTATION_FILE)) {
-        fs.writeFileSync(ROTATION_FILE, JSON.stringify({}));
-    }
-
     try {
-        const fileData = fs.readFileSync(ROTATION_FILE);
-        const rotations = JSON.parse(fileData);
-        res.json({ rotation: rotations[category] || 0 });
+        // Busca la pantalla, si no existe, la crea
+        let screen = await Screen.findOne({ category });
+        if (!screen) {
+            screen = await Screen.create({ category });
+        }
+        res.json(screen);
     } catch (error) {
-        console.error("Error leyendo rotación:", error);
-        res.status(500).json({ rotation: 0 });
+        res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/api/rotation/:category', (req, res) => {
+// RUTA B: Actualizar Rotación
+app.post('/api/rotation/:category', async (req, res) => {
     const { category } = req.params;
     const { rotation } = req.body;
-
-    if (!fs.existsSync(ROTATION_FILE)) {
-        fs.writeFileSync(ROTATION_FILE, JSON.stringify({}));
-    }
-
     try {
-        const fileData = fs.readFileSync(ROTATION_FILE);
-        const rotations = JSON.parse(fileData);
-
-        rotations[category] = rotation;
-
-        fs.writeFileSync(ROTATION_FILE, JSON.stringify(rotations, null, 2));
-
-        res.json({ success: true, rotation: rotation });
+        const screen = await Screen.findOneAndUpdate(
+            { category },
+            { rotation },
+            { new: true, upsert: true } // Crea si no existe
+        );
+        res.json(screen);
     } catch (error) {
-        console.error("Error guardando rotación:", error);
-        res.status(500).json({ success: false });
+        res.status(500).json({ error: error.message });
     }
 });
 
-app.use(express.static(path.join(__dirname, '../client/dist')));
+// RUTA C: Subir Video Nuevo (¡Directo a la Nube!)
+app.post('/api/upload/:category', upload.single('video'), async (req, res) => {
+    const { category } = req.params;
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No hay archivo' });
 
-app.get(/(.*)/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+        // Guardamos la URL de Cloudinary en la base de datos
+        const screen = await Screen.findOneAndUpdate(
+            { category },
+            { 
+                videoUrl: req.file.path, 
+                publicId: req.file.filename 
+            },
+            { new: true, upsert: true }
+        );
+
+        res.json({ success: true, screen });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al subir video' });
+    }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\nSERVIDOR INICIADO EXITOSAMENTE`);
-    console.log(`--------------------------------------------------`);
-    console.log(` PARA VER EN LAS PANTALLAS:`);
-    console.log(` http://${HOST_IP}:${PORT}`);
-    console.log(`--------------------------------------------------\n`);
+// --- 5. INICIAR ---
+app.listen(PORT, () => {
+    console.log(`SERVIDOR LISTO EN PUERTO ${PORT}`);
 });
