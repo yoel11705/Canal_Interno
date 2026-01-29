@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import api from '../../api';
 import './LoginModal.css';
 
 const LoginModal = ({ onClose, onLogin }) => {
@@ -14,10 +13,34 @@ const LoginModal = ({ onClose, onLogin }) => {
         setIsLoading(true);
 
         try {
-            const data = await api.login(username, password);
-            onLogin(data.token);
+            // 1. Conectamos directamente con TU servidor backend
+            const response = await fetch('http://localhost:5000/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+
+            // 2. Si la respuesta no es OK (ej: usuario no encontrado), lanzamos error
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al iniciar sesión');
+            }
+
+            // 3. ¡Éxito! Guardamos el token y cerramos
+            // data.token viene de tu backend (res.json({ token, username }))
+            console.log("Login exitoso:", data.username);
+            onLogin(data.token); 
+            
         } catch (err) {
-            setError(err.response?.data?.error || 'Login failed');
+            console.error("Error de conexión:", err);
+            // Si el servidor está apagado, el error será "Failed to fetch"
+            const mensaje = err.message === 'Failed to fetch' 
+                ? 'No se puede conectar con el servidor (¿Está prendido?)' 
+                : err.message;
+            setError(mensaje);
         } finally {
             setIsLoading(false);
         }
@@ -35,6 +58,7 @@ const LoginModal = ({ onClose, onLogin }) => {
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Usuario"
                             required
                         />
                     </div>
@@ -44,10 +68,11 @@ const LoginModal = ({ onClose, onLogin }) => {
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            placeholder="contraseña"
                             required
                         />
                     </div>
-                    {error && <p className="error-msg">{error}</p>}
+                    {error && <p className="error-msg">⚠️ {error}</p>}
                     <button type="submit" className="login-btn" disabled={isLoading}>
                         {isLoading ? 'Verificando...' : 'Desbloquear'}
                     </button>

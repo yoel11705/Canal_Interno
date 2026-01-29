@@ -1,110 +1,177 @@
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
+const { Pool } = require('pg'); 
 const dotenv = require('dotenv');
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('cloudinary').v2;
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+// Si pusiste una clave en .env la usa, si no, usa la frase por defecto
+const SECRET_KEY = process.env.JWT_SECRET || "mi_secreto_super_seguro";
 
 // --- 1. CONFIGURACIONES ---
-app.use(cors({ origin: '*' })); // Permitir acceso desde cualquier lugar
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Configurar Cloudinary (Videos)
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Configurar MongoDB (Base de Datos)
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('CONECTADO A MONGODB'))
-    .catch(err => console.error('ERROR MONGODB:', err));
-
-// --- 2. MODELO DE DATOS (Esquema) ---
-// Así se guardará la info de cada pantalla en la nube
-const ScreenSchema = new mongoose.Schema({
-    category: { type: String, required: true, unique: true }, // ej: "lobby"
-    rotation: { type: Number, default: 0 },
-    videoUrl: { type: String, default: "" }, // Link de Cloudinary
-    publicId: { type: String, default: "" }  // ID para borrarlo después si hace falta
+// Conexión a Base de Datos SQL (Neon)
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false } 
 });
 
-const Screen = mongoose.model('Screen', ScreenSchema);
+// --- 2. INICIALIZACIÓN DE TABLAS Y USUARIOS ---
+const initDB = async () => {
+    try {
+        // Crear Tabla de Usuarios
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            );
+        `);
+        
+        // Crear Tabla de Pantallas
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS screens (
+                id SERIAL PRIMARY KEY,
+                category TEXT UNIQUE NOT NULL,
+                rotation INTEGER DEFAULT 0,
+                video_url TEXT DEFAULT '',
+                public_id TEXT DEFAULT ''
+            );
+        `);
+
+        console.log('✅ TABLAS SQL VERIFICADAS');
+
+        await crearUsuarioSiNoExiste('Carlos', 'C_Mexsa0126');
+        await crearUsuarioSiNoExiste('Recepcion', 'Hotel2024'); 
+        await crearUsuarioSiNoExiste('Gerente', 'AdminTotal');  
+
+    } catch (err) {
+        console.error('❌ ERROR INICIALIZANDO DB:', err);
+    }
+};
+
+// Función inteligente para crear usuarios sin duplicados
+async function crearUsuarioSiNoExiste(nombreUser, passwordUser) {
+    try {
+        // 1. Buscamos si ya existe
+        const res = await pool.query('SELECT * FROM users WHERE username = $1', [nombreUser]);
+        
+        if (res.rows.length === 0) {
+            // 2. Si no existe, encriptamos y creamos
+            const hashedPassword = await bcrypt.hash(passwordUser, 10);
+            await pool.query('INSERT INTO users (username, password) VALUES ($1, $2)', [nombreUser, hashedPassword]);
+            console.log(`👤 Usuario NUEVO creado: ${nombreUser}`);
+        } else {
+            // 3. Si ya existe, avisamos
+            console.log(`👀 El usuario "${nombreUser}" ya existe (Saltando...)`);
+        }
+    } catch (err) {
+        console.error(`Error creando a ${nombreUser}:`, err);
+    }
+}
+
+// Ejecutamos la inicialización
+initDB();
 
 // --- 3. CONFIGURAR SUBIDA DE VIDEOS ---
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
-    params: {
-        folder: 'hotel-screens', // Nombre de la carpeta en Cloudinary
-        resource_type: 'video',  // Importante: le decimos que son videos
-    },
+    params: { folder: 'hotel-screens', resource_type: 'video' },
 });
 const upload = multer({ storage: storage });
 
 // --- 4. RUTAS (API) ---
 
-// RUTA A: Obtener info de una pantalla (Video actual y Rotación)
+// LOGIN
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        // Buscar usuario
+        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        const user = result.rows[0];
+
+        if (!user) return res.status(400).json({ error: 'Usuario no encontrado' });
+
+        // Verificar contraseña
+        const validPass = await bcrypt.compare(password, user.password);
+        if (!validPass) return res.status(400).json({ error: 'Contraseña incorrecta' });
+
+        // Crear Token
+        const token = jwt.sign({ id: user.id }, SECRET_KEY);
+        res.json({ token, username });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error en el servidor al loguear' });
+    }
+});
+
+// OBTENER DATOS DE PANTALLA
 app.get('/api/screen/:category', async (req, res) => {
     const { category } = req.params;
     try {
-        // Busca la pantalla, si no existe, la crea
-        let screen = await Screen.findOne({ category });
-        if (!screen) {
-            screen = await Screen.create({ category });
+        let result = await pool.query('SELECT * FROM screens WHERE category = $1', [category]);
+        
+        if (result.rows.length === 0) {
+            // Si la pantalla no existe en la DB, la creamos al momento
+            result = await pool.query(
+                'INSERT INTO screens (category, rotation, video_url) VALUES ($1, 0, \'\') RETURNING *',
+                [category]
+            );
         }
-        res.json(screen);
+        res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// RUTA B: Actualizar Rotación
+// CAMBIAR ROTACIÓN
 app.post('/api/rotation/:category', async (req, res) => {
     const { category } = req.params;
     const { rotation } = req.body;
     try {
-        const screen = await Screen.findOneAndUpdate(
-            { category },
-            { rotation },
-            { new: true, upsert: true } // Crea si no existe
-        );
-        res.json(screen);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+        // Actualizar si existe, Insertar si no (Upsert)
+        const query = `
+            INSERT INTO screens (category, rotation) VALUES ($1, $2)
+            ON CONFLICT (category) DO UPDATE SET rotation = $2 RETURNING *;
+        `;
+        const result = await pool.query(query, [category, rotation]);
+        res.json(result.rows[0]);
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// RUTA C: Subir Video Nuevo (¡Directo a la Nube!)
+// SUBIR VIDEO
 app.post('/api/upload/:category', upload.single('video'), async (req, res) => {
     const { category } = req.params;
     try {
-        if (!req.file) return res.status(400).json({ error: 'No hay archivo' });
-
-        // Guardamos la URL de Cloudinary en la base de datos
-        const screen = await Screen.findOneAndUpdate(
-            { category },
-            { 
-                videoUrl: req.file.path, 
-                publicId: req.file.filename 
-            },
-            { new: true, upsert: true }
-        );
-
-        res.json({ success: true, screen });
-    } catch (error) {
+        if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+        
+        // Guardar URL del video en la base de datos
+        const query = `
+            INSERT INTO screens (category, video_url, public_id) VALUES ($1, $2, $3)
+            ON CONFLICT (category) DO UPDATE SET video_url = $2, public_id = $3 RETURNING *;
+        `;
+        const result = await pool.query(query, [category, req.file.path, req.file.filename]);
+        
+        res.json({ success: true, screen: result.rows[0] });
+    } catch (error) { 
         console.error(error);
-        res.status(500).json({ error: 'Error al subir video' });
+        res.status(500).json({ error: 'Error subiendo video' }); 
     }
 });
 
-// --- 5. INICIAR ---
-app.listen(PORT, () => {
-    console.log(`SERVIDOR LISTO EN PUERTO ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 SERVIDOR LISTO EN PUERTO ${PORT}`));

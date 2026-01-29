@@ -1,52 +1,64 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { FaCompress, FaExpand, FaRedo } from 'react-icons/fa';
+import { FaExpand, FaRedo } from 'react-icons/fa'; // Asegúrate de importar iconos si usas
 import './VideoPlayer.css';
 
-// URL AUTOMÁTICA: Si estamos en local usa localhost, si no, la nube
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const VideoPlayer = ({ category }) => {
     const videoRef = useRef(null);
+    const containerRef = useRef(null); // Referencia al contenedor principal
     const [videoSrc, setVideoSrc] = useState(null);
     const [rotation, setRotation] = useState(0);
+    const [loading, setLoading] = useState(false);
+    
+    // ESTADO NUEVO: Para saber si estamos en full screen
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    // --- VIGILANTE DE LA NUBE ---
     const checkStatus = async () => {
         try {
             const res = await fetch(`${API_URL}/api/screen/${category}`);
             if (res.ok) {
                 const data = await res.json();
-                
-                // 1. Actualizar Rotación
-                if (data.rotation !== rotation) {
-                    setRotation(data.rotation);
+                if (data.rotation !== rotation) setRotation(data.rotation);
+                if (data.video_url && data.video_url !== videoSrc) {
+                    setVideoSrc(data.video_url);
+                    setLoading(false);
                 }
-
-                // 2. Actualizar Video (Si cambió la URL)
-                if (data.videoUrl && data.videoUrl !== videoSrc) {
-                    console.log("Nuevo video detectado de la nube");
-                    setVideoSrc(data.videoUrl);
-                }
+            } else {
+                setVideoSrc(null);
+                setLoading(false);
             }
         } catch (err) {
-            console.error("Error conectando:", err);
+            console.error(err);
+            setLoading(false);
         }
     };
 
-    // Revisar cada 5 segundos
     useEffect(() => {
+        setVideoSrc(null);
+        setLoading(true);
         checkStatus();
         const interval = setInterval(checkStatus, 5000);
         return () => clearInterval(interval);
-    }, [category, videoSrc, rotation]); // Dependencias clave
+    }, [category]);
 
-    // --- ROTAR MANUALMENTE ---
+    // --- NUEVO: DETECTOR DE EVENTOS DE PANTALLA COMPLETA ---
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            // Si hay un elemento en fullscreen, ponemos true, si no, false
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+
+        // Escuchamos el evento del navegador
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        
+        // Limpieza al salir
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
     const handleRotate = async () => {
         const newRot = (rotation + 90) % 360;
-        setRotation(newRot); // Cambio visual inmediato
-        
-        // Guardar en MongoDB
+        setRotation(newRot); 
         await fetch(`${API_URL}/api/rotation/${category}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -54,10 +66,10 @@ const VideoPlayer = ({ category }) => {
         });
     };
 
-    // --- FULLSCREEN ---
     const toggleFull = () => {
         if (!document.fullscreenElement) {
-            videoRef.current?.parentElement?.parentElement?.requestFullscreen();
+            // Usamos containerRef para que abarque TODO (botones y video)
+            containerRef.current?.requestFullscreen();
         } else {
             document.exitFullscreen();
         }
@@ -66,12 +78,16 @@ const VideoPlayer = ({ category }) => {
     const isVertical = rotation === 90 || rotation === 270;
 
     return (
-        <div className="video-container">
+        // AQUI ESTA LA CLAVE: Agregamos la clase dinámicamente
+        <div 
+            ref={containerRef}
+            className={`video-container ${isFullscreen ? 'fullscreen-mode' : ''}`}
+        >
             {videoSrc ? (
                 <div className="video-wrapper">
                     <video
                         ref={videoRef}
-                        src={videoSrc} // URL directa de Cloudinary
+                        src={videoSrc}
                         autoPlay loop muted playsInline
                         className="main-video"
                         style={{
@@ -82,12 +98,15 @@ const VideoPlayer = ({ category }) => {
                     />
                 </div>
             ) : (
-                <div className="video-placeholder"><h2>Esperando señal...</h2></div>
+                <div className="video-placeholder">
+                   {loading ? <h2>Cargando...</h2> : <h2>Esperando señal...</h2>}
+                </div>
             )}
 
+            {/* Los controles */}
             <div className="controls-overlay">
-                <button onClick={handleRotate}><FaRedo /></button>
-                <button onClick={toggleFull}><FaExpand /></button>
+                <button className="control-btn" onClick={handleRotate}><FaRedo /></button>
+                <button className="control-btn" onClick={toggleFull}><FaExpand /></button>
             </div>
         </div>
     );

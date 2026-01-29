@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import api from '../../api';
 import './Dashboard.css';
 
+// Asegúrate de que estos nombres sean EXACTAMENTE iguales a los que usarás en la URL
 const categories = ['Inicio', 'HH', 'Room Service', 'Promociones', 'Clientes'];
 
 const Dashboard = ({ onLogout }) => {
@@ -14,33 +15,36 @@ const Dashboard = ({ onLogout }) => {
 
         const formData = new FormData();
         formData.append('video', file);
-        formData.append('category', category);
+        // No es necesario append category al formData si ya lo pasamos como parámetro, 
+        // pero no estorba.
 
         setUploading(category);
         setMessage(null);
 
         try {
             const token = localStorage.getItem('token');
-            await api.uploadVideo(formData, token);
-            setMessage({ type: 'success', text: `Video for ${category} updated!` });
+            
+            // --- CORRECCIÓN AQUÍ ---
+            // Antes faltaba pasar 'category' como primer dato
+            await api.uploadVideo(category, formData, token);
+            // ------------------------
+
+            setMessage({ type: 'success', text: `✅ Video de ${category} actualizado con éxito!` });
         } catch (error) {
-            setMessage({ type: 'error', text: `Failed to upload: ${error.response?.data?.error || error.message}` });
+            console.error(error);
+            setMessage({ type: 'error', text: `❌ Error al subir: ${error.response?.data?.error || error.message}` });
         } finally {
             setUploading(null);
-            e.target.value = null;
+            e.target.value = null; // Limpiar el input para permitir subir el mismo archivo si es necesario
         }
     };
 
     const handleDelete = async (category) => {
-        if (!window.confirm(`Are you sure you want to delete the video for ${category}?`)) return;
-
-        try {
-            const token = localStorage.getItem('token');
-            await api.deleteVideo(category, token);
-            setMessage({ type: 'success', text: `Video for ${category} deleted` });
-        } catch (error) {
-            setMessage({ type: 'error', text: `Failed to delete: ${error.response?.data?.error || error.message}` });
-        }
+        alert("⚠️ Función no disponible aún: Para borrar un video, simplemente sube uno nuevo que lo reemplace.");
+        /* NOTA: Comentamos esto porque tu servidor (index.js) NO tiene ruta de DELETE.
+           Si quieres borrar, tendríamos que programar el backend primero.
+           Por ahora, el sistema funciona "reemplazando" el video viejo por el nuevo.
+        */
     };
 
     return (
@@ -63,7 +67,7 @@ const Dashboard = ({ onLogout }) => {
                             <h3>{cat}</h3>
                             <div className="card-actions">
                                 <label className="upload-btn">
-                                    {uploading === cat ? 'Subiendo...' : 'Subir Nuevo Video'}
+                                    {uploading === cat ? '⏳ Subiendo...' : '📤 Subir Video'}
                                     <input
                                         type="file"
                                         accept="video/mp4,video/webm"
@@ -72,11 +76,14 @@ const Dashboard = ({ onLogout }) => {
                                         disabled={uploading === cat}
                                     />
                                 </label>
+                                
+                                {/* Botón de eliminar desactivado temporalmente */}
                                 <button
                                     className="delete-btn"
                                     onClick={() => handleDelete(cat)}
+                                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
                                 >
-                                    Eliminar Video
+                                    Eliminar
                                 </button>
                             </div>
                         </div>

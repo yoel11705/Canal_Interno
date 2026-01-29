@@ -20,7 +20,7 @@ router.post('/login', async (req, res) => {
             if (allUsers[0].count === 0 && username === 'admin' && password === 'admin123') {
                 const hashedPassword = await bcrypt.hash(password, 10);
                 await db.query('INSERT INTO users (username, password_hash) VALUES (?, ?)', [username, hashedPassword]);
-                // Re-fetch
+                
                 const [newUsers] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
                 const user = newUsers[0];
                 const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
