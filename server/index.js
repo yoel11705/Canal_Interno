@@ -81,7 +81,7 @@ app.get(/(.*)/, (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\nSERVIDOR INICIADO EXITOSAMENTE`);
     console.log(`--------------------------------------------------`);
-    console.log(` PARA VER EN LAS PANTALLAS USA ESTA URL:`);
+    console.log(` PARA VER EN LAS PANTALLAS:`);
     console.log(` http://${HOST_IP}:${PORT}`);
     console.log(`--------------------------------------------------\n`);
 });
